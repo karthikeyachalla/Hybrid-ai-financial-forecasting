@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Data files (large - user can download via yfinance)
+*.csv
+*.parquet
+*.h5
+*.hdf5
+*.npz
+data/
+
+# ML model checkpoints (large binary files)
+*.pt
+*.pth
+*.pkl
+*.joblib
+*.ckpt
+checkpoints/
+models/
+
+# Logs
+*.log
+logs/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Secrets / Env files
+.env
+*.env
+secrets.py
+
+# PDF reports (large)
+*.pdf
+
+# Streamlit cache
+.streamlit/cache/
