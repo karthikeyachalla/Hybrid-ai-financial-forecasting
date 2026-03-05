@@ -6,13 +6,13 @@ from plotly.subplots import make_subplots
 import requests
 import time
 
-from data_loader import download_data
-from feature_engineering import add_technical_indicators
-from advanced_volatility import generate_ensemble_forecast
-from advanced_regime import analyze_regime
-from sentiment_engine import fetch_news_sentiment, get_sentiment_gauge_color
-from explainability import generate_plain_english_explanation
-from backtest import run_backtest, format_backtest_report
+from src.data_loader import download_data
+from src.feature_engineering import add_technical_indicators
+from src.advanced_volatility import generate_ensemble_forecast
+from src.advanced_regime import analyze_regime
+from src.sentiment_engine import fetch_news_sentiment, get_sentiment_gauge_color
+from src.explainability import generate_plain_english_explanation
+from src.backtest import run_backtest, format_backtest_report
 
 # ─────────────────────────────────────────────────────────────
 # PAGE CONFIG
@@ -185,8 +185,8 @@ if st.sidebar.button("⚡ INITIATE QUANT SCAN", use_container_width=True):
                     df['Adj Close'] if 'Adj Close' in df.columns else df['Close'])), 4)}
                 for c in df.columns
                 if c not in ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume',
-                             'Return', 'Log_Return']
-                and df[c].dtype in [float, 'float64']
+                             'Return', 'Log_Return', 'Realized_Vol']
+                and df[c].dtype in [float, 'float64', 'int64']
             ][:8]
         }
         shap_info['top_features'].sort(key=lambda x: x['importance'], reverse=True)

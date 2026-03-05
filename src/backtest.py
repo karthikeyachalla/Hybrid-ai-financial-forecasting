@@ -121,8 +121,12 @@ def format_backtest_report(metrics: dict) -> str:
 
 
 if __name__ == '__main__':
-    from data_loader import download_data
-    from advanced_volatility import generate_ensemble_forecast
+    try:
+        from src.data_loader import download_data
+    except ImportError:
+        from data_loader import download_data
+    
+    # Simple self-test
 
     df = download_data("RELIANCE.NS", years=5)
     if df is not None:

@@ -172,8 +172,12 @@ def analyze_regime(df: pd.DataFrame) -> dict:
 
 
 if __name__ == '__main__':
-    from data_loader import download_data
-    from feature_engineering import add_technical_indicators
+    try:
+        from src.data_loader import download_data
+        from src.feature_engineering import add_technical_indicators
+    except ImportError:
+        from data_loader import download_data
+        from feature_engineering import add_technical_indicators
     df = download_data("RELIANCE.NS", years=5)
     if df is not None:
         df = add_technical_indicators(df)

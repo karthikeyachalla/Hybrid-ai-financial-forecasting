@@ -92,7 +92,10 @@ def _manual_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 
 if __name__ == '__main__':
-    from data_loader import download_data
+    try:
+        from src.data_loader import download_data
+    except ImportError:
+        from data_loader import download_data
     df = download_data("RELIANCE.NS", years=5)
     if df is not None:
         df_features = add_technical_indicators(df)

@@ -189,7 +189,10 @@ def generate_ensemble_forecast(df: pd.DataFrame) -> dict:
 
 
 if __name__ == '__main__':
-    from data_loader import download_data
+    try:
+        from src.data_loader import download_data
+    except ImportError:
+        from data_loader import download_data
     df = download_data("RELIANCE.NS", years=5)
     if df is not None:
         result = generate_ensemble_forecast(df)
