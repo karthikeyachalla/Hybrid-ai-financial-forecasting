@@ -1,55 +1,79 @@
+"""
+regime_detection.py — HMM-Based Market Regime Detection
+Identifies calm vs volatile market periods using Gaussian HMM.
+"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import pandas as pd
 import numpy as np
-from hmmlearn import hmm
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import os
+from src.data_loader import download_data
 
-def detect_regimes(ticker="NSEI"):
-    filename = f"{ticker}_10y_data.csv"
-    if not os.path.exists(filename):
-        print(f"File {filename} not found.")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'output')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+try:
+    from hmmlearn import hmm
+    HAS_HMM = True
+except ImportError:
+    HAS_HMM = False
+
+
+def detect_regimes(ticker="RELIANCE.NS", years=5):
+    print(f"[Regime] Detecting market regimes for {ticker}...")
+
+    if not HAS_HMM:
+        print("[Regime] ❌ hmmlearn is not installed. Install with: pip install hmmlearn")
         return
-        
-    df = pd.read_csv(filename, index_col=0, parse_dates=True)
+
+    df = download_data(ticker, years=years)
+    if df is None:
+        return
+
     returns = df['Log_Return'].values.reshape(-1, 1)
-    
-    # Fit Gaussian HMM with 2 components (Calm vs Volatile)
+
     model = hmm.GaussianHMM(n_components=2, covariance_type="diag", n_iter=1000)
     model.fit(returns)
-    
-    # Predict regimes (Viterbi decoding is usually default in predict)
     hidden_states = model.predict(returns)
-    
-    # Analyze states to identify which is 'Calm' (lower variance)
-    var_0 = model.covars_[0][0]
-    var_1 = model.covars_[1][0]
-    
-    if var_0 < var_1:
-        calm_state = 0
-        volatile_state = 1
-    else:
-        calm_state = 1
-        volatile_state = 0
-        
+
+    calm_state = 0 if model.covars_[0][0] < model.covars_[1][0] else 1
     df['Regime'] = hidden_states
     df['Regime_Label'] = df['Regime'].apply(lambda x: 'Calm' if x == calm_state else 'Volatile')
-    
-    # Plotting Regimes
-    plt.figure(figsize=(12, 8))
-    plt.subplot(2, 1, 1)
-    plt.plot(df['Log_Return'], color='gray', alpha=0.5)
-    plt.scatter(df.index, df['Log_Return'], c=df['Regime'], cmap='viridis', s=10)
-    plt.title('Market Regimes (Log Returns Colored by State)')
-    
-    plt.subplot(2, 1, 2)
-    plt.plot(df['Regime'], color='orange')
-    plt.title('Regime State Over Time (0 and 1)')
+
+    # Stats
+    calm_pct = (df['Regime_Label'] == 'Calm').mean() * 100
+    current = df['Regime_Label'].iloc[-1]
+    print(f"  Current regime: {current}")
+    print(f"  Calm periods:   {calm_pct:.1f}%")
+    print(f"  Volatile:       {100 - calm_pct:.1f}%")
+
+    # Plot
+    fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
+    colors = ['#10b981' if s == calm_state else '#ef4444' for s in df['Regime']]
+    axes[0].scatter(df.index, df['Log_Return'], c=colors, s=3, alpha=0.7)
+    axes[0].set_title(f'{ticker} — Returns Colored by Regime', fontweight='bold')
+    axes[0].set_ylabel('Log Return')
+
+    axes[1].fill_between(df.index, df['Regime'], alpha=0.4, color='#f59e0b')
+    axes[1].set_title('Regime State (0=Calm, 1=Volatile)', fontweight='bold')
+    axes[1].set_ylabel('State')
     plt.tight_layout()
-    plt.savefig('market_regimes.png')
+
+    plot_path = os.path.join(OUTPUT_DIR, f'{ticker}_regimes.png')
+    plt.savefig(plot_path, dpi=150)
     plt.close()
-    
-    df.to_csv('market_regimes.csv')
-    print("Regime detection complete. Saved to market_regimes.csv and market_regimes.png")
+
+    csv_path = os.path.join(OUTPUT_DIR, f'{ticker}_regimes.csv')
+    df[['Log_Return', 'Regime', 'Regime_Label']].to_csv(csv_path)
+
+    print(f"[Regime] ✅ Plot: {plot_path}")
+    print(f"[Regime] ✅ CSV:  {csv_path}")
+    return {'plot': plot_path, 'csv': csv_path, 'current_regime': current}
+
 
 if __name__ == "__main__":
-    detect_regimes()
+    ticker = sys.argv[1] if len(sys.argv) > 1 else "RELIANCE.NS"
+    detect_regimes(ticker)
