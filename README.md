@@ -1,4 +1,4 @@
-# 📈 QuantVision – Volatility & Regime AI
+# 📈 PROJECT 3 — Financial Market Volatility Modeling
 
 > **ATS QUANT-PRO | Next-Gen Financial Intelligence**  
 > Hybrid AI system for stock volatility forecasting and market regime detection.  
