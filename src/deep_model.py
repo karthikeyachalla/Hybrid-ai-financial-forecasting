@@ -1,16 +1,46 @@
-"""
-deep_model.py
-Phase IV: Multi-horizon LSTM Forecaster (7-day and 30-day)
-Outputs quantile predictions (10%, 50%, 90%) for uncertainty-aware forecasts.
-Falls back to a statistical baseline if PyTorch is not available.
-"""
+import os
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import Ridge
 
-
 LOOKBACK = 30   # days of history to use as input
+_MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
+
+
+def _pretrained_forecaster_path(horizon):
+    return os.path.join(_MODELS_DIR, f'global_forecast_lstm_{horizon}d.pt')
+
+
+def _load_pretrained_forecaster(horizon):
+    """Try to load a pre-trained global LSTM forecaster. Returns model or None."""
+    path = _pretrained_forecaster_path(horizon)
+    if not os.path.exists(path):
+        return None
+    try:
+        import torch
+        import torch.nn as nn
+
+        class LSTMForecaster(nn.Module):
+            def __init__(self, input_size=2, horizon=7, hidden=64):
+                super().__init__()
+                self.lstm = nn.LSTM(input_size, hidden, num_layers=2, batch_first=True, dropout=0.2)
+                self.head_lo = nn.Linear(hidden, horizon)
+                self.head_md = nn.Linear(hidden, horizon)
+                self.head_hi = nn.Linear(hidden, horizon)
+            def forward(self, x):
+                ctx = self.lstm(x)[0][:, -1, :]
+                return self.head_lo(ctx), self.head_md(ctx), self.head_hi(ctx)
+
+        model = LSTMForecaster(input_size=2, horizon=horizon)
+        model.load_state_dict(torch.load(path, map_location='cpu'))
+        model.eval()
+        print(f"[LSTM] ✅ Loaded pre-trained {horizon}d global forecaster (Fast Mode)")
+        return model
+    except Exception as e:
+        print(f"[LSTM] Could not load pre-trained {horizon}d model ({e}). Training on-the-fly.")
+        return None
+
 
 
 def _prepare_multistep_data(series: np.ndarray, lookback: int, horizon: int):
@@ -53,7 +83,23 @@ def train_lstm(features: pd.DataFrame, target_col: str = 'Close',
                horizon: int = 7, epochs: int = 60):
     """
     Trains the LSTM and returns the model, scaler, and feature columns.
+    First checks for a pre-trained global model (Fast Mode), then falls
+    back to on-the-fly training if not found.
     """
+    # ── Fast Mode: load pre-trained global model ──────────────────────────
+    pretrained = _load_pretrained_forecaster(horizon)
+    if pretrained is not None:
+        price_col = 'Adj Close' if 'Adj Close' in features.columns else 'Close'
+        feature_cols = [price_col, 'Log_Return']
+        feature_cols = [c for c in feature_cols if c in features.columns]
+        data = features[feature_cols].dropna().values.astype(np.float32)
+        scaler = MinMaxScaler()
+        scaler.fit_transform(data)   # fit so predict_horizon can inverse_transform
+        return {'type': 'pytorch', 'model': pretrained, 'scaler': scaler,
+                'feature_cols': feature_cols, 'price_idx': 0,
+                'horizon': horizon, 'pretrained': True}
+
+    # ── Dynamic Mode: train from scratch ──────────────────────────────────
     price_col = 'Adj Close' if 'Adj Close' in features.columns else target_col
     feature_cols = [c for c in features.columns
                     if c not in ['Open', 'High', 'Low', 'Close', 'Adj Close',
@@ -94,7 +140,8 @@ def train_lstm(features: pd.DataFrame, target_col: str = 'Close',
 
         print(f"[LSTM] Training complete (horizon={horizon}d). Final loss: {loss.item():.4f}")
         return {'type': 'pytorch', 'model': model, 'scaler': scaler,
-                'feature_cols': feature_cols, 'price_idx': price_idx, 'horizon': horizon}
+                'feature_cols': feature_cols, 'price_idx': price_idx,
+                'horizon': horizon, 'pretrained': False}
 
     except ImportError:
         print("[LSTM] PyTorch unavailable. Using Ridge regression fallback.")
@@ -102,7 +149,9 @@ def train_lstm(features: pd.DataFrame, target_col: str = 'Close',
         lr = Ridge(alpha=1.0)
         lr.fit(X_train.reshape(n, -1), y_train)
         return {'type': 'sklearn', 'model': lr, 'scaler': scaler,
-                'feature_cols': feature_cols, 'price_idx': price_idx, 'horizon': horizon}
+                'feature_cols': feature_cols, 'price_idx': price_idx,
+                'horizon': horizon, 'pretrained': False}
+
 
 
 def predict_horizon(trained: dict, features: pd.DataFrame) -> dict:

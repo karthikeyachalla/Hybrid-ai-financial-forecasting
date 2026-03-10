@@ -142,7 +142,16 @@ use_finbert = st.sidebar.toggle("🤖 Use FinBERT (Slower, Better)", value=False
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Architecture:**")
 st.sidebar.markdown("- Realized GARCH + Neural Vol\n- VAE Anomaly Scorer\n- Bayesian Change-Points\n- FinBERT Sentiment\n- LSTM Multi-Horizon\n- SHAP Explainability\n- Backtesting Engine")
-st.sidebar.caption("QUANT-PRO v4.0 | Hybrid AI Edition")
+
+import os as _os
+_models_dir = _os.path.join(_os.path.dirname("app.py"), 'models')
+_fast_mode = _os.path.exists(_os.path.join(_models_dir, 'global_volatility_lstm.pt'))
+if _fast_mode:
+    st.sidebar.success("⚡ Fast Mode Active (Pre-trained Global Model)")
+else:
+    st.sidebar.info("🔄 Dynamic Mode (Train on-the-fly)\n\nRun `notebooks/Train_Global_LSTM.ipynb` on Colab to enable Fast Mode.")
+
+st.sidebar.caption("QUANT-PRO v4.1 | Hybrid AI Edition")
 
 # ─────────────────────────────────────────────────────────────
 # HEADER

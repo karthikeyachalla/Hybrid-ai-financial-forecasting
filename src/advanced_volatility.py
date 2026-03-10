@@ -3,6 +3,7 @@ advanced_volatility.py
 Phase I: Realized GARCH + Neural Volatility LSTM Ensemble
 Replaces the basic GARCH model with a hybrid ensemble.
 """
+import os
 import numpy as np
 import pandas as pd
 from arch import arch_model
@@ -27,10 +28,46 @@ def fit_garch_model(returns: pd.Series):
     return result
 
 
+_PRETRAINED_VOL_PATH  = os.path.join(os.path.dirname(__file__), '..', 'models', 'global_volatility_lstm.pt')
+_PRETRAINED_VOL_SCALER = os.path.join(os.path.dirname(__file__), '..', 'models', 'global_vol_scaler.pkl')
+
+
+def _load_pretrained_vol_model():
+    """Try to load the pre-trained global volatility LSTM. Returns (model, scaler) or (None, None)."""
+    try:
+        import torch
+        import torch.nn as nn
+        import joblib
+
+        if not (os.path.exists(_PRETRAINED_VOL_PATH) and os.path.exists(_PRETRAINED_VOL_SCALER)):
+            return None, None
+
+        class NeuralVol(nn.Module):
+            def __init__(self, input_size=1, hidden=64):
+                super().__init__()
+                self.lstm = nn.LSTM(input_size, hidden, num_layers=2, batch_first=True, dropout=0.2)
+                self.fc = nn.Linear(hidden, 1)
+            def forward(self, x):
+                out, _ = self.lstm(x)
+                return self.fc(out[:, -1, :])
+
+        model = NeuralVol()
+        model.load_state_dict(torch.load(_PRETRAINED_VOL_PATH, map_location='cpu'))
+        model.eval()
+        scaler = joblib.load(_PRETRAINED_VOL_SCALER)
+        print("[NeuralVol] ✅ Loaded pre-trained global model (Fast Mode)")
+        return model, scaler
+    except Exception as e:
+        print(f"[NeuralVol] Could not load pre-trained model ({e}). Falling back to on-the-fly training.")
+        return None, None
+
+
 def build_neural_vol_model(train_X, train_y):
     """
     Builds a 2-layer LSTM for volatility prediction.
-    Falls back to a simple linear model if PyTorch is unavailable.
+    Tries to load a pre-trained global model first (Fast Mode).
+    Falls back to on-the-fly training if pre-trained model not found.
+    Falls back to linear model if PyTorch is unavailable.
     """
     try:
         import torch
@@ -113,8 +150,16 @@ def generate_ensemble_forecast(df: pd.DataFrame) -> dict:
 
     # --- 3. Neural Vol Component ---
     lookback = 20
-    scaler = MinMaxScaler()
-    rv_scaled = scaler.fit_transform(realized_vol.values.reshape(-1, 1)).flatten()
+
+    # Try to load pre-trained global model first (Fast Mode)
+    pretrained_model, pretrained_scaler = _load_pretrained_vol_model()
+    if pretrained_model is not None:
+        scaler = pretrained_scaler
+    else:
+        scaler = MinMaxScaler()
+        scaler.fit(realized_vol.values.reshape(-1, 1))
+
+    rv_scaled = scaler.transform(realized_vol.values.reshape(-1, 1)).flatten()
     rv_series = pd.Series(rv_scaled, index=realized_vol.index)
 
     X, y = prepare_sequences(rv_series, lookback=lookback)
@@ -122,7 +167,10 @@ def generate_ensemble_forecast(df: pd.DataFrame) -> dict:
     X_train, X_test = X[:split], X[split:]
     y_train, y_test = y[:split], y[split:]
 
-    neural_model, backend, X_tensor_train = build_neural_vol_model(X_train, y_train)
+    if pretrained_model is not None:
+        neural_model, backend, X_tensor_train = pretrained_model, 'pytorch', None
+    else:
+        neural_model, backend, X_tensor_train = build_neural_vol_model(X_train, y_train)
 
     # Predict next step
     last_seq = X[-1:]
