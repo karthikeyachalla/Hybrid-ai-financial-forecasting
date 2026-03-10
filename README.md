@@ -1,4 +1,4 @@
-# 📈 PROJECT 3 — Financial Market Volatility Modeling
+# 📈 Hybrid AI Financial Forecasting: Volatility & Market Regimes
 
 > **ATS QUANT-PRO | Next-Gen Financial Intelligence**  
 > Hybrid AI system for stock volatility forecasting and market regime detection.  
