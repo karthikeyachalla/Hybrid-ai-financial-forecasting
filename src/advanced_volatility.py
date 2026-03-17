@@ -38,9 +38,25 @@ def _load_pretrained_vol_model():
         import torch
         import torch.nn as nn
         import joblib
+        import sys
 
         if not (os.path.exists(_PRETRAINED_VOL_PATH) and os.path.exists(_PRETRAINED_VOL_SCALER)):
             return None, None
+
+        # Fix joblib unpickling by injecting TorchScaler into __main__
+        class TorchScaler:
+            def fit(self, X):
+                self.min_ = X.min(axis=0)
+                self.max_ = X.max(axis=0)
+                return self
+            def transform(self, X):
+                return (X - self.min_) / (self.max_ - self.min_ + 1e-8)
+            def fit_transform(self, X):
+                return self.fit(X).transform(X)
+            def inverse_transform(self, X):
+                return X * (self.max_ - self.min_ + 1e-8) + self.min_
+        
+        sys.modules['__main__'].TorchScaler = TorchScaler
 
         class NeuralVol(nn.Module):
             def __init__(self, input_size=1, hidden=64):

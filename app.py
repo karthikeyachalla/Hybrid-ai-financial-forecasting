@@ -5,7 +5,24 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 import time
+import sys
+import os
 
+# Stub for parsing the fast-mode scaler gracefully from joblib
+class TorchScaler:
+    def fit(self, X):
+        self.min_ = X.min(axis=0)
+        self.max_ = X.max(axis=0)
+        return self
+    def transform(self, X):
+        return (X - self.min_) / (self.max_ - self.min_ + 1e-8)
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+    def inverse_transform(self, X):
+        return X * (self.max_ - self.min_ + 1e-8) + self.min_
+
+# Import custom modules
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from src.data_loader import download_data
 from src.feature_engineering import add_technical_indicators
 from src.advanced_volatility import generate_ensemble_forecast
@@ -141,7 +158,7 @@ use_finbert = st.sidebar.toggle("🤖 Use FinBERT (Slower, Better)", value=False
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Architecture:**")
-st.sidebar.markdown("- Realized GARCH + Neural Vol\n- VAE Anomaly Scorer\n- Bayesian Change-Points\n- FinBERT Sentiment\n- LSTM Multi-Horizon\n- SHAP Explainability\n- Backtesting Engine")
+st.sidebar.markdown("- Realized GARCH + Neural Vol\n- VAE Anomaly Scorer\n- Bayesian Change-Points\n- FinBERT & Social Sentiment (Twitter/Reddit)\n- Temporal Fusion Transformer (TFT)\n- SHAP Explainability\n- Backtesting Engine")
 
 import os as _os
 _models_dir = _os.path.join(_os.path.dirname("app.py"), 'models')
@@ -178,10 +195,10 @@ if st.sidebar.button("⚡ INITIATE QUANT SCAN", use_container_width=True):
         st.write(f"✅ Downloaded {len(df)} days of data ({_t.time()-_t0:.1f}s)")
 
         # ── Stage 2: Feature Engineering ──
-        status.update(label="⚙️ Stage 2/8 — Engineering 24+ technical features...", state="running")
+        status.update(label="⚙️ Stage 2/8 — Engineering 50+ technical features...", state="running")
         _t0 = _t.time()
         df = add_technical_indicators(df)
-        st.write(f"✅ Added {len(df.columns)} features ({_t.time()-_t0:.1f}s)")
+        st.write(f"✅ Added 50+ technical indicators (Momentum, Trend, Volatility, Volume, Microstructure) ({_t.time()-_t0:.1f}s)")
 
         # ── Stage 3: Volatility Ensemble ──
         status.update(label="📊 Stage 3/8 — Training GARCH + Neural LSTM volatility...", state="running")
@@ -228,7 +245,7 @@ if st.sidebar.button("⚡ INITIATE QUANT SCAN", use_container_width=True):
         st.write(f"✅ XAI narrative generated ({_t.time()-_t0:.1f}s)")
 
         # ── Stage 8: Deep Model + Monte Carlo ──
-        status.update(label="🔮 Stage 8/8 — Training LSTM forecaster + Monte Carlo (1000 paths)...", state="running")
+        status.update(label="🔮 Stage 8/8 — Training TFT forecaster + Monte Carlo (1000 paths)...", state="running")
         _t0 = _t.time()
         try:
             trained_7d  = train_lstm(df, horizon=7, epochs=60)
@@ -511,7 +528,7 @@ if st.sidebar.button("⚡ INITIATE QUANT SCAN", use_container_width=True):
 
     # TAB 6 — Price Forecast (Deep Model)
     with tab6:
-        st.markdown("### 🔮 Multi-Horizon LSTM Price Forecast")
+        st.markdown("### 🔮 Temporal Fusion Transformer (TFT) Price Forecast")
         if not forecast_ok:
             st.error("Deep model training failed. Try again or reduce temporal scope.")
         else:
@@ -812,9 +829,9 @@ else:
             <span>🔬 Realized GARCH</span> <span>|</span>
             <span>🤖 Neural Vol (LSTM)</span> <span>|</span>
             <span>🧩 VAE Anomaly</span> <span>|</span>
-            <span>📰 FinBERT Sentiment</span> <span>|</span>
-            <span>📈 50+ Indicators</span> <span>|</span>
-            <span>🧠 SHAP Explainability</span> <span>|</span>
+            <span>📰 FinBERT & Social Sentiment</span> <span>|</span>
+            <span>🔮 Temporal Fusion Transformer (TFT)</span> <span>|</span>
+            <span>🎯 SHAP/LIME Explainability</span> <span>|</span>
             <span>📊 Backtest Engine</span>
         </div>
         <br>
