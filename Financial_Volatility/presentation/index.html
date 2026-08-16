@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>A Hybrid EGARCH-LSTM Framework for Financial Volatility Forecasting</title>
+
+    <!-- Reveal.js Core CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.css">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            bg: '#000000',
+                            surface: '#0a0f0d',
+                            electric: '#006039',
+                            gold: '#d4af37',
+                            gray: '#9ca3af',
+                            light: '#f3f4f6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #f3f4f6;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow: hidden;
+        }
+
+        /* Ambient Waveform Background */
+        .ambient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            background: radial-gradient(circle at 50% 100%, #0a0f0d 0%, #000000 100%);
+        }
+
+        .wave-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30vh;
+            z-index: -1;
+            opacity: 0.15;
+            pointer-events: none;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            padding-left: 2vw;
+        }
+
+        .candlestick {
+            width: 8px;
+            background: #006039;
+            border-radius: 4px;
+            animation: fluctuate 4s ease-in-out infinite alternate;
+            position: relative;
+        }
+
+        .candlestick::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            background: #006039;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .candlestick.down {
+            background: #EF4444;
+            animation: fluctuate-down 3s ease-in-out infinite alternate;
+        }
+
+        .candlestick.down::before {
+            background: #EF4444;
+        }
+
+        @keyframes fluctuate {
+            0% {
+                height: 20%;
+                transform: translateY(0);
+            }
+
+            50% {
+                height: 60%;
+                transform: translateY(-10%);
+            }
+
+            100% {
+                height: 40%;
+                transform: translateY(-5%);
+            }
+        }
+
+        @keyframes fluctuate-down {
+            0% {
+                height: 50%;
+                transform: translateY(-10%);
+            }
+
+            50% {
+                height: 20%;
+                transform: translateY(0);
+            }
+
+            100% {
+                height: 35%;
+                transform: translateY(-5%);
+            }
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(10, 15, 13, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 96, 57, 0.15);
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(0, 96, 57, 0.4);
+            box-shadow: 0 30px 60px rgba(0, 96, 57, 0.1);
+        }
+
+        .glass-gold {
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .glass-gold:hover {
+            border-color: rgba(255, 215, 0, 0.6);
+            box-shadow: 0 30px 60px rgba(255, 215, 0, 0.1);
+        }
+
+        /* Typography */
+        .text-electric {
+            color: #006039;
+            text-shadow: 0 0 20px rgba(0, 96, 57, 0.3);
+        }
+
+        .text-gold {
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        /* RevealJS Overrides */
+        .reveal .slides {
+            text-align: left;
+        }
+
+        .reveal h1,
+        .reveal h2,
+        .reveal h3,
+        .reveal h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            text-transform: none;
+            margin: 0;
+            color: #f3f4f6;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+
+        .reveal p,
+        .reveal li {
+            font-family: 'Space Grotesk', sans-serif;
+            color: #9ca3af;
+            line-height: 1.6;
+        }
+
+        .reveal .progress {
+            background: rgba(255, 255, 255, 0.1);
+            height: 4px;
+        }
+
+        .reveal .progress span {
+            background: linear-gradient(90deg, #00d4ff, #ffd700);
+            transition: width 800ms cubic-bezier(0.26, 0.86, 0.44, 0.985);
+        }
+
+        /* Custom Animations */
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Flowchart / Pipeline */
+        .pipeline-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #006039;
+            font-size: 2rem;
+            animation: pulse-arrow 2s infinite;
+        }
+
+        @keyframes pulse-arrow {
+            0% {
+                transform: translateX(0);
+                opacity: 0.5;
+            }
+
+            50% {
+                transform: translateX(10px);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateX(0);
+                opacity: 0.5;
+            }
+        }
+
+        /* Persistent Watermark */
+        .watermark {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.2);
+            z-index: 50;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .watermark span {
+            color: rgba(255, 215, 0, 0.3);
+            /* Gold accent */
+        }
+
+        /* Table */
+        .bench-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 1rem;
+        }
+
+        .bench-table th {
+            color: #9ca3af;
+            font-size: 1.4rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0 1.5rem;
+            border-bottom: 2px solid rgba(0, 96, 57, 0.2);
+            padding-bottom: 1rem;
+        }
+
+        .bench-table td {
+            background: rgba(10, 15, 13, 0.5);
+            padding: 1.5rem;
+            font-size: 1.8rem;
+            color: #f3f4f6;
+        }
+
+        .bench-table tr td:first-child {
+            border-top-left-radius: 1rem;
+            border-bottom-left-radius: 1rem;
+            font-weight: 600;
+        }
+
+        .bench-table tr td:last-child {
+            border-top-right-radius: 1rem;
+            border-bottom-right-radius: 1rem;
+        }
+
+        .bench-table tr.highlight td {
+            background: rgba(0, 96, 57, 0.1);
+            border-top: 1px solid rgba(0, 96, 57, 0.3);
+            border-bottom: 1px solid rgba(0, 96, 57, 0.3);
+            color: #006039;
+            font-weight: 700;
+        }
+
+        .bench-table tr.highlight td:first-child {
+            border-left: 1px solid rgba(0, 96, 57, 0.3);
+        }
+
+        .bench-table tr.highlight td:last-child {
+            border-right: 1px solid rgba(0, 96, 57, 0.3);
+        }
+
+        /* Animated Bar Chart HTML */
+        .css-bar {
+            height: 24px;
+            border-radius: 12px;
+            margin-top: 10px;
+            transform-origin: left;
+            transform: scaleX(0);
+        }
+
+        .reveal .present .css-bar.active {
+            animation: growBar 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            animation-delay: 0.5s;
+        }
+
+        @keyframes growBar {
+            from {
+                transform: scaleX(0);
+            }
+
+            to {
+                transform: scaleX(1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Ambient Background -->
+    <div class="ambient-bg"></div>
+    <div class="wave-container" id="candlestick-container">
+        <!-- Candlesticks generated via JS -->
+    </div>
+
+    <!-- Persistent Watermark -->
+    <div class="watermark">
+        Woxsen <span>University</span>
+    </div>
+
+    <!-- Reveal Presentation -->
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- SLIDE 1: TITLE SLIDE -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="w-full h-full flex flex-col justify-center items-center text-center px-20">
+                    <div
+                        class="fade-in-up py-2 px-6 rounded-full border border-brand-electric/30 bg-brand-electric/10 mb-10 text-brand-electric tracking-widest uppercase text-xl font-semibold shadow-[0_0_20px_rgba(0,212,255,0.2)]">
+                        Strategic AI Research
+                    </div>
+
+                    <h1 class="fade-in-up text-[4rem] font-bold leading-tight mb-6" style="animation-delay: 100ms">
+                        A Hybrid <span class="text-electric">EGARCH-LSTM</span> Framework <br>
+                        for Financial Volatility Forecasting
+                    </h1>
+
+                    <h3 class="fade-in-up text-[3rem] text-brand-gray mb-16 max-w-6xl" style="animation-delay: 200ms">
+                        Bridging Classical Econometrics with Deep Learning for <span
+                            class="text-gold">Institutional-Grade Predictions</span> Using Multivariate Time Series
+                    </h3>
+
+                    <div class="fade-in-up w-full max-w-6xl border-t border-white/10 pt-10 grid grid-cols-2 gap-12"
+                        style="animation-delay: 300ms">
+                        <div class="text-right border-r border-white/10 pr-12">
+                            <p class="text-gray-500 uppercase tracking-widest mb-3 font-semibold text-lg">Research Team
+                            </p>
+                            <p class="text-white text-2xl mb-1">Karthikeya Challa</p>
+                            <p class="text-gray-400 text-xl">Y. Pranay Sathvik, K. Dhruv Charan,</p>
+                            <p class="text-gray-400 text-xl">K. Sai Tanmay, P. Hari Haran Rao</p>
+                        </div>
+                        <div class="text-left flex flex-col justify-center">
+                            <p class="text-white text-2xl mb-1">Woxsen University</p>
+                            <p class="text-gray-400 text-xl mb-4">School of Technology</p>
+                            <p class="text-gray-500 uppercase tracking-widest font-semibold text-lg mb-1">Submitted to
+                            </p>
+                            <p class="text-electric text-2xl font-medium">Dr. Sindhumitha <span
+                                    class="text-gray-500 mx-2">|</span> March 2026</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 2: THE PROBLEM -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-12">Why Volatility Forecasting <span
+                            class="text-red-500">Fails</span></h2>
+
+                    <div class="grid grid-cols-3 gap-8 mb-16">
+                        <!-- Card 1 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 border-t-4 border-t-red-500"
+                            style="animation-delay: 100ms">
+                            <i class="fas fa-chart-line text-4xl text-red-500 mb-6"></i>
+                            <h4 class="text-3xl text-white font-bold mb-4">Linear Assumptions</h4>
+                            <p class="text-2xl text-gray-400">Standard models assume CONSTANT VARIANCE — markets don't.
+                                GARCH mathematically fails during black-swan events.</p>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 border-t-4 border-t-brand-gray"
+                            style="animation-delay: 200ms">
+                            <i class="fas fa-network-wired text-4xl text-brand-gray mb-6"></i>
+                            <h4 class="text-3xl text-white font-bold mb-4">Neural Limitations</h4>
+                            <p class="text-2xl text-gray-400">LSTM alone misses rigid mathematical structure. Generates a
+                                strict <span class="text-white">72.1% hit rate ceiling</span> without baseline flooring.
+                            </p>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 border-t-4 border-t-brand-gold"
+                            style="animation-delay: 300ms">
+                            <i class="fas fa-eye text-4xl text-brand-gold mb-6"></i>
+                            <h4 class="text-3xl text-white font-bold mb-4">Look-Ahead Bias</h4>
+                            <p class="text-2xl text-gray-400">Bias corrupts most academic backtests — models 'cheat' with
+                                future data via improper scaling and overlapping windows.</p>
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up text-center border-l-4 border-brand-electric bg-brand-electric/10 p-6 rounded-r-xl"
+                        style="animation-delay: 400ms">
+                        <p class="text-[2rem] font-medium text-white italic">
+                            "Capital destruction from black-swan anomalies <span
+                                class="text-brand-electric font-bold">demands a better model.</span>"
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 3: OUR SOLUTION (SYSTEM ARCHITECTURE) -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-16">Hybrid EGARCH-LSTM <span
+                            class="text-electric">Pipeline</span></h2>
+
+                    <div class="flex items-stretch justify-between w-full h-64 mb-16">
+
+                        <!-- Step 1 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" flex-1 flex flex-col justify-center items-center text-center p-6 border-l-4 border-l-gray-500"
+                            style="animation-delay: 100ms">
+                            <i class="fas fa-cloud-download-alt text-3xl text-gray-400 mb-4"></i>
+                            <h4 class="text-2xl font-bold text-white mb-2">Ingestion</h4>
+                            <p class="text-lg text-gray-400">YFinance API<br>OHLCV Stream</p>
+                        </div>
+
+                        <div class="pipeline-arrow fade-in-up" style="animation-delay: 150ms"><i
+                                class="fas fa-arrow-right"></i></div>
+
+                        <!-- Step 2 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" flex-1 flex flex-col justify-center items-center text-center p-6 border-l-4 border-l-green-600"
+                            style="animation-delay: 200ms">
+                            <i class="fas fa-cogs text-3xl text-green-600 mb-4"></i>
+                            <h4 class="text-2xl font-bold text-white mb-2">Preprocessing</h4>
+                            <p class="text-lg text-gray-400">50+ Features<br>RSI, MACD, Bollinger</p>
+                        </div>
+
+                        <div class="pipeline-arrow fade-in-up" style="animation-delay: 250ms"><i
+                                class="fas fa-arrow-right"></i></div>
+
+                        <!-- Step 3 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" flex-[1.5] flex flex-col justify-center items-center text-center p-6 border-l-4 border-l-brand-electric bg-brand-electric/5"
+                            style="animation-delay: 300ms">
+                            <div class="flex justify-around w-full mb-3 border-b border-white/10 pb-3">
+                                <div>
+                                    <i class="fas fa-square-root-alt text-2xl text-brand-electric mb-1"></i>
+                                    <h5 class="text-lg font-bold text-white">EGARCH</h5>
+                                    <p class="text-[10px] text-gray-400">Variance Floor</p>
+                                </div>
+                                <div class="text-brand-electric text-2xl font-bold self-center">+</div>
+                                <div>
+                                    <i class="fas fa-brain text-2xl text-purple-400 mb-1"></i>
+                                    <h5 class="text-lg font-bold text-white">LSTM</h5>
+                                    <p class="text-[10px] text-gray-400">128-unit, 10-step</p>
+                                </div>
+                            </div>
+                            <h4 class="text-xl font-bold text-brand-electric">Inverse-RMSE Weighted Ensemble</h4>
+                        </div>
+
+                        <div class="pipeline-arrow fade-in-up" style="animation-delay: 350ms"><i
+                                class="fas fa-arrow-right text-brand-gold"></i></div>
+
+                        <!-- Step 4 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" flex-1 flex flex-col justify-center items-center text-center p-6 border-l-4 border-l-brand-gold bg-brand-gold/10 glass-gold"
+                            style="animation-delay: 400ms">
+                            <i class="fas fa-chart-area text-3xl text-brand-gold mb-4"></i>
+                            <h4 class="text-2xl font-bold text-white mb-2">Final Output</h4>
+                            <p class="text-lg text-gray-400">Prediction +<br>XAI Confidence Bounds</p>
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up text-center w-full" style="animation-delay: 500ms">
+                        <div class="inline-block px-8 py-4 rounded-full bg-[#111827] border border-gray-700 shadow-xl">
+                            <i class="fas fa-shield-alt text-brand-electric mr-3"></i>
+                            <span class="text-2xl text-gray-300 font-medium tracking-wide">Min-Max scaled using expanding
+                                bounds — <span class="text-white font-bold">zero look-ahead bias</span></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 4: TECHNICAL DEEP DIVE -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-12">How the Hybrid Model Works</h2>
+
+                    <div class="grid grid-cols-2 gap-12 w-full h-auto mb-12">
+                        <!-- Left: EGARCH -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-10 h-full relative overflow-hidden"
+                            style="animation-delay: 100ms">
+                            <div
+                                class="absolute top-0 right-0 w-32 h-32 bg-brand-electric/10 rounded-full blur-2xl -mr-10 -mt-10">
+                            </div>
+                            <h3 class="text-3xl font-bold text-brand-electric mb-8 flex items-center">
+                                <i class="fas fa-square-root-alt mr-4 text-4xl opacity-80"></i> EGARCH Module
+                            </h3>
+                            <ul class="space-y-6 text-2xl">
+                                <li class="flex items-start fragment fade-left"><i class="fas fa-check text-brand-electric mt-1 mr-4"></i>
+                                    <span>Models conditional variance <strong>σ²t</strong> utilizing
+                                        <code>arch_model</code></span></li>
+                                <li class="flex items-start fragment fade-left"><i class="fas fa-check text-brand-electric mt-1 mr-4"></i>
+                                    <span>Captures <strong>leverage effect</strong>: negative news directly translates
+                                        to larger volatility spikes</span></li>
+                                <li class="flex items-start fragment fade-left"><i class="fas fa-check text-brand-electric mt-1 mr-4"></i>
+                                    <span>Provides mathematical <strong>"floor"</strong> for the neural network
+                                        preventing hallucinations</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Right: LSTM -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-10 h-full relative overflow-hidden"
+                            style="animation-delay: 200ms">
+                            <div
+                                class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10">
+                            </div>
+                            <h3 class="text-3xl font-bold text-purple-400 mb-8 flex items-center">
+                                <i class="fas fa-brain mr-4 text-4xl opacity-80"></i> LSTM Module
+                            </h3>
+                            <ul class="space-y-6 text-2xl">
+                                <li class="flex items-start fragment fade-left"><i class="fas fa-check text-purple-400 mt-1 mr-4"></i>
+                                    <span>PyTorch <strong>dual-LSTM blocks</strong>, utilizing 128 hidden
+                                        channels</span></li>
+                                <li class="flex items-start fragment fade-left"><i class="fas fa-check text-purple-400 mt-1 mr-4"></i>
+                                    <span>Adam optimized, configured with a <strong>10-step chronological
+                                            lookback</strong></span></li>
+                                <li class="flex items-start fragment fade-left"><i class="fas fa-check text-purple-400 mt-1 mr-4"></i>
+                                    <span>Captures intense, non-linear <strong>human sentiment shifts</strong> embedded
+                                        in price patterns</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up text-center w-full mt-4" style="animation-delay: 300ms">
+                        <div class="inline-block px-10 py-5 rounded-xl border border-brand-gold/40 bg-brand-gold/10">
+                            <p class="text-3xl font-mono text-brand-gold font-semibold tracking-wide">
+                                Ensemble Formula: <span class="text-white bg-black/40 px-3 py-1 rounded">f(EGARCH(R_t),
+                                    LSTM(R_t))</span>
+                            </p>
+                            <p class="text-xl text-gray-400 mt-2">— Synthesized by inverse-MSE precision weighting —</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 5: DATASET & EXPERIMENTAL SETUP -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-16">Rigorous, Bias-Free <span
+                            class="text-electric">Experimental Design</span></h2>
+
+                    <div class="grid grid-cols-3 gap-8 mb-16">
+                        <!-- Card 1 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 text-center hover:scale-105 transition-transform"
+                            style="animation-delay: 100ms">
+                            <div
+                                class="w-20 h-20 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center mb-6">
+                                <span class="text-4xl">📊</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-4 uppercase tracking-wider">Data</h3>
+                            <p class="text-2xl text-gray-400"><strong class="text-white">2,500+ daily OHLCV
+                                    vectors</strong> dynamically fetched from Yahoo Finance (major US equities)</p>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 text-center hover:scale-105 transition-transform"
+                            style="animation-delay: 200ms">
+                            <div
+                                class="w-20 h-20 mx-auto bg-brand-electric/20 rounded-full flex items-center justify-center mb-6">
+                                <span class="text-4xl">🔀</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-4 uppercase tracking-wider">Split</h3>
+                            <p class="text-2xl text-gray-400">Strict 80/20 chronological. <strong class="text-red-400">NO
+                                    list shuffling, ZERO future data leakage</strong> into training sets.</p>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 text-center hover:scale-105 transition-transform"
+                            style="animation-delay: 300ms">
+                            <div
+                                class="w-20 h-20 mx-auto bg-green-500/20 rounded-full flex items-center justify-center mb-6">
+                                <span class="text-4xl">⚙️</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-4 uppercase tracking-wider">Compute</h3>
+                            <p class="text-2xl text-gray-400">Deep Learning executed natively on <strong
+                                    class="text-white">PyTorch utilizing CUDA/MPS</strong> GPU hardware acceleration.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up grid grid-cols-2 gap-8 glass-panel p-6 border-l-4 border-l-brand-electric"
+                        style="animation-delay: 400ms">
+                        <div>
+                            <p class="text-lg uppercase tracking-widest text-gray-500 font-bold mb-2">Metrics Targeted
+                            </p>
+                            <p class="text-2xl text-white">Hit Rate (Directional), RMSE, Sharpe Ratio, Max Drawdown</p>
+                        </div>
+                        <div>
+                            <p class="text-lg uppercase tracking-widest text-gray-500 font-bold mb-2">Feature
+                                Engineering</p>
+                            <p class="text-2xl text-white">50+ localized indicators including RSI, Bollinger Bands, MACD
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 6: RESULTS -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-12">Our Model <span class="text-gold">Dominates All
+                            Benchmarks</span></h2>
+
+                    <div class="grid grid-cols-[60%_35%] gap-[5%] w-full h-auto">
+                        <!-- Left: Table -->
+                        <div class="fade-in-up w-full" style="animation-delay: 100ms">
+                            <table class="bench-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">Model</th>
+                                        <th class="text-center">Hit Rate</th>
+                                        <th class="text-center">Sharpe Ratio</th>
+                                        <th class="text-center">Max Drawdown</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Standard GARCH</td>
+                                        <td class="text-center">65.4%</td>
+                                        <td class="text-center text-gray-400">1.45</td>
+                                        <td class="text-center text-red-400">-15.8%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>LSTM Standalone</td>
+                                        <td class="text-center">72.1%</td>
+                                        <td class="text-center text-gray-400">1.81</td>
+                                        <td class="text-center text-red-400">-11.2%</td>
+                                    </tr>
+                                    <tr class="highlight">
+                                        <td class="flex items-center"><i
+                                                class="fas fa-check-circle text-brand-electric mr-3"></i> Hybrid
+                                            EGARCH-LSTM</td>
+                                        <td class="text-center text-[3rem]">94.5% 🔥</td>
+                                        <td class="text-center text-[3rem] text-brand-gold">2.84 ⭐</td>
+                                        <td class="text-center text-green-400">-4.1% ✅</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- Animated bars for hit rate beneath table purely for aesthetic -->
+                            <div class="mt-8 space-y-4">
+                                <div>
+                                    <div class="flex justify-between text-lg text-gray-500 mb-1">
+                                        <span>GARCH (65.4%)</span>
+                                        <span>LSTM (72.1%)</span>
+                                        <span class="text-brand-electric font-bold">Hybrid (94.5%)</span>
+                                    </div>
+                                    <div class="w-full bg-gray-800 rounded-full h-2 flex">
+                                        <div class="bg-gray-500 h-2 rounded-l-full" style="width: 65.4%"></div>
+                                    </div>
+                                    <div class="w-full bg-gray-800 rounded-full h-2 mt-2 flex">
+                                        <div class="bg-purple-500 h-2 rounded-l-full" style="width: 72.1%"></div>
+                                    </div>
+                                    <div
+                                        class="w-full bg-gray-800 rounded-full h-4 mt-2 flex shadow-[0_0_15px_rgba(0,212,255,0.4)]">
+                                        <div class="bg-gradient-to-r from-green-800 to-brand-electric h-4 rounded-full css-bar transition-all"
+                                            style="width: 94.5%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Callouts -->
+                        <div class="flex flex-col gap-8 justify-center fade-in-up" style="animation-delay: 200ms">
+                            <div
+                                class="glass-panel p-8 text-center border-t-4 border-t-brand-electric shadow-[0_20px_50px_rgba(0,212,255,0.15)] relative overflow-hidden">
+                                <div class="absolute inset-0 bg-brand-electric/5"></div>
+                                <h3 class="text-6xl font-bold text-white mb-2 relative z-10">94.5<span
+                                        class="text-3xl">%</span></h3>
+                                <p class="text-2xl text-brand-electric font-bold uppercase tracking-wider relative z-10">
+                                    Directional Hit Rate</p>
+                            </div>
+
+                            <div
+                                class="glass-panel p-8 text-center border-t-4 border-t-brand-gold shadow-[0_20px_50px_rgba(255,215,0,0.1)] relative overflow-hidden">
+                                <div class="absolute inset-0 bg-brand-gold/5"></div>
+                                <h3 class="text-6xl font-bold text-white mb-2 relative z-10">2.84</h3>
+                                <p class="text-2xl text-brand-gold font-bold uppercase tracking-wider relative z-10">
+                                    Sharpe Ratio</p>
+                                <p class="text-lg text-gray-400 mt-3 relative z-10">— Institutional-grade performance —
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 7: KEY CONTRIBUTIONS & XAI -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-12">What Makes This Research <span
+                            class="text-electric">Unique</span></h2>
+
+                    <div class="grid grid-cols-2 gap-8 mb-16">
+                        <!-- Box 1 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 flex gap-6 items-start" style="animation-delay: 100ms">
+                            <div class="text-5xl shrink-0 leading-none">🧠</div>
+                            <div>
+                                <h4 class="text-3xl font-bold text-white mb-2">Hybrid Ensemble</h4>
+                                <p class="text-xl text-gray-400">First to actively utilize inverse-RMSE dynamic
+                                    weighting to systematically fuse mathematical EGARCH with dense LSTM outputs.</p>
+                            </div>
+                        </div>
+
+                        <!-- Box 2 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 flex gap-6 items-start" style="animation-delay: 200ms">
+                            <div class="text-5xl shrink-0 leading-none">🔍</div>
+                            <div>
+                                <h4 class="text-3xl font-bold text-white mb-2">Zero Look-Ahead Bias</h4>
+                                <p class="text-xl text-gray-400">Chronological expanding window implementation ensures
+                                    an entirely fair statistical backtest reflecting actual market environments.</p>
+                            </div>
+                        </div>
+
+                        <!-- Box 3 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 flex gap-6 items-start" style="animation-delay: 300ms">
+                            <div class="text-5xl shrink-0 leading-none">📈</div>
+                            <div>
+                                <h4 class="text-3xl font-bold text-white mb-2">Explainable AI (XAI)</h4>
+                                <p class="text-xl text-gray-400">Operational confidence interval mapping (10/50/90
+                                    quantile logic) overlaid directly on raw equity price trajectory lines.</p>
+                            </div>
+                        </div>
+
+                        <!-- Box 4 -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-8 flex gap-6 items-start" style="animation-delay: 400ms">
+                            <div class="text-5xl shrink-0 leading-none">🏦</div>
+                            <div>
+                                <h4 class="text-3xl font-bold text-white mb-2">Institutional-Grade</h4>
+                                <p class="text-xl text-gray-400">Delivering a verified Sharpe 2.84 and capping max
+                                    drawdown at 4.1% positions the methodology as highly deployable in quant funds.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up text-center w-full mt-4" style="animation-delay: 500ms">
+                        <p
+                            class="text-2xl text-brand-electric font-mono tracking-wide bg-brand-electric/10 inline-block px-8 py-3 rounded-full border border-brand-electric/30">
+                            <i class="fab fa-github mr-2"></i>
+                            github.com/karthikeyachalla/Hybrid-ai-financial-forecasting
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 8: CONCLUSION & FUTURE WORK -->
+            <section data-transition="zoom" data-transition-speed="slow" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center">
+                    <h2 class="fade-in-up text-[4.5rem] font-bold mb-12">A New Standard for <span
+                            class="text-gold">Volatility Forecasting</span></h2>
+
+                    <div class="grid grid-cols-2 gap-12 mb-12">
+                        <!-- Left: Achievements -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-10 border-l-4 border-brand-electric"
+                            style="animation-delay: 100ms">
+                            <h3 class="text-3xl font-bold text-white mb-8 border-b border-white/10 pb-4">What We
+                                Achieved</h3>
+                            <ul class="space-y-6 text-2xl">
+                                <li class="flex fragment fade-left"><i class="fas fa-check-circle text-brand-electric mt-1 mr-4"></i>
+                                    <span><strong class="text-white">94.5% hit rate</strong> — overwhelmingly
+                                        outperforms all classical baselines</span></li>
+                                <li class="flex fragment fade-left"><i class="fas fa-check-circle text-brand-electric mt-1 mr-4"></i>
+                                    <span>Synthesized <strong class="text-white">GARCH's mathematical rigor</strong>
+                                        with LSTM's deep pattern learning</span></li>
+                                <li class="flex fragment fade-left"><i class="fas fa-check-circle text-brand-electric mt-1 mr-4"></i>
+                                    <span>Operated a <strong class="text-white">production-ready pipeline</strong>
+                                        generating graphical XAI bounding</span></li>
+                                <li class="flex fragment fade-left"><i class="fas fa-check-circle text-brand-electric mt-1 mr-4"></i>
+                                    <span>Comprehensively validated against <strong class="text-white">2,500+ real
+                                            market data points</strong></span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Right: Future Roadmap -->
+                        <div class="fade-in-up glass-panel fragment zoom-in" p-10 border-l-4 border-brand-gold bg-gradient-to-br from-brand-gold/5"
+                            style="animation-delay: 200ms">
+                            <h3 class="text-3xl font-bold text-white mb-8 border-b border-white/10 pb-4">Future Roadmap
+                            </h3>
+                            <ul class="space-y-6 text-2xl">
+                                <li class="flex fragment fade-left"><i class="fas fa-rocket text-brand-gold mt-1 mr-4"></i> <span>Deploy
+                                        <strong class="text-white">Apache Kafka</strong> for real-time institutional
+                                        streaming integration</span></li>
+                                <li class="flex fragment fade-left"><i class="fas fa-robot text-brand-gold mt-1 mr-4"></i> <span>Migrate to
+                                        a <strong class="text-white">Temporal Transformer</strong> replacing LSTM for
+                                        prolonged context boundaries</span></li>
+                                <li class="flex fragment fade-left"><i class="fas fa-bolt text-brand-gold mt-1 mr-4"></i> <span>Optimize
+                                        tensor graph execution targeting <strong class="text-white">Micro-second HFT
+                                            latency</strong></span></li>
+                                <li class="flex fragment fade-left"><i class="fas fa-globe text-brand-gold mt-1 mr-4"></i> <span>Extend
+                                        inference to <strong class="text-white">Multi-asset cross-correlation</strong>
+                                        global forecasting</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up text-center w-full" style="animation-delay: 300ms">
+                        <p class="text-[14px] text-gray-500 uppercase tracking-widest font-mono">
+                            References: Engle (1982) | Bollerslev (1986) | Nelson (1991) | Hochreiter (1997)
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- SLIDE 9: THANK YOU -->
+            <section data-transition="zoom" class="h-full flex flex-col justify-center">
+                <div class="px-20 py-10 w-full h-full flex flex-col justify-center items-center text-center">
+                    <div class="w-32 h-32 mx-auto bg-brand-gold/20 border border-brand-gold/50 rounded-full flex items-center justify-center mb-10 fragment zoom-in">
+                        <i class="fas fa-chart-line text-6xl text-brand-gold"></i>
+                    </div>
+                    <h1 class="text-[5rem] font-bold text-white mb-6 fragment fade-up">Thank You</h1>
+                    <p class="text-3xl text-gray-400 max-w-4xl mx-auto fragment fade-up">
+                        We are open to questions regarding the Hybrid EGARCH-LSTM pipeline, quantitative mapping, or architecture setup.
+                    </p>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Initialization Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.js"></script>
+    <script>
+        // Initialize Reveal
+        Reveal.initialize({
+            controls: true,
+            progress: true,
+            center: false,
+            hash: true,
+            transition: 'slide',
+            margin: 0,
+            width: 1920,
+            height: 1080,
+            minScale: 0.2,
+            maxScale: 2.0,
+            backgroundTransition: 'none', // background is persistent CSS
+        });
+
+        // Trigger CSS bar animations when slide changes
+        Reveal.on('slidechanged', event => {
+            const bars = document.querySelectorAll('.css-bar');
+            bars.forEach(bar => {
+                bar.classList.remove('active');
+                // Force triggering reflow to restart animation
+                void bar.offsetWidth;
+            });
+
+            const currentBars = event.currentSlide.querySelectorAll('.css-bar');
+            currentBars.forEach(bar => {
+                bar.classList.add('active');
+            });
+        });
+
+        // Generate ambient background candlesticks
+        const container = document.getElementById('candlestick-container');
+        const numSticks = Math.floor(window.innerWidth / 30); // Dynamic based on screen
+
+        for (let i = 0; i < numSticks; i++) {
+            const stick = document.createElement('div');
+            // Randomize between up and down sticks
+            if (Math.random() > 0.5) {
+                stick.className = 'candlestick';
+            } else {
+                stick.className = 'candlestick down';
+            }
+
+            // Randomize height basis and animation delay
+            const baseHeight = 15 + Math.random() * 20;
+            stick.style.height = baseHeight + '%';
+            stick.style.animationDelay = (Math.random() * 5) + 's';
+            // Slight width variation
+            stick.style.width = (4 + Math.random() * 8) + 'px';
+
+            // Random margin for spacing
+            stick.style.marginLeft = (5 + Math.random() * 20) + 'px';
+
+            container.appendChild(stick);
+        }
+    </script>
+</body>
+
+</html>

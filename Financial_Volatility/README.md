@@ -2,7 +2,7 @@
 
 > **ATS QUANT-PRO | Next-Gen Financial Intelligence**  
 > Hybrid AI system for stock volatility forecasting and market regime detection.  
-> Powered by Realized GARCH · TFT · VAE · FinBERT + Social Sentiment · Explainable AI (SHAP/LIME)
+> Powered by Realized GARCH · VAE · FinBERT · Explainable AI (SHAP/LIME)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red?logo=streamlit)
@@ -18,9 +18,8 @@ This system automatically fetches live stock data (no manual download needed) an
 
 - 📊 **Predict volatility** using a blend of Realized GARCH (statistical) + LSTM (deep learning)
 - 🌍 **Detect market regimes** (Calm / Crisis) using a Variational Autoencoder (VAE) + Bayesian Change-Point Detection
-- 📰 **Analyze news sentiment** using FinBERT + Social Media (Twitter/Reddit)
+- 📰 **Analyze news sentiment** using FinBERT
 - 🧩 **Explain every prediction** using SHAP and LIME (so we know *why* the model said what it said)
-- 🔮 **Forecast multi-horizon trends** using a Temporal Fusion Transformer (TFT)
 - 📉 **Backtest the strategy** and compute Sharpe Ratio, Sortino Ratio, Max Drawdown, VaR, CVaR
 
 ---
@@ -100,7 +99,6 @@ Open your browser at `http://localhost:8501` 🎉
 |--------|---------|-----------------|
 | Yahoo Finance | `yfinance` | Historical OHLCV prices (daily + 5-min intraday) and news headlines |
 | FinBERT | `transformers` | Sentiment scores for news headlines (Positive / Negative / Neutral) |
-| Reddit *(optional)* | `praw` | Social sentiment (requires API keys in `.env`) |
 
 ---
 
@@ -113,7 +111,6 @@ Open your browser at `http://localhost:8501` 🎉
 | **Ensemble (GARCH + LSTM)** | Hybrid | Weighted blend using inverse-RMSE; best of both worlds |
 | **VAE (Variational Autoencoder)** | Unsupervised DL | Detects anomalous/extreme market states (anomaly score 0–100) |
 | **Bayesian Change-Point Detection** | Probabilistic | Finds structural breaks in the market (e.g., crash onset dates) |
-| **LSTM Quantile Forecaster** | Deep Learning | 7-day and 30-day price forecasts with 10%/50%/90% confidence bands |
 | **FinBERT** | NLP Transformer | Finance-specific sentiment analysis on news headlines |
 | **SHAP + LIME** | XAI | Explains *why* the model made a specific prediction |
 
@@ -169,7 +166,6 @@ lime               ← Explainable AI (LIME)
 arch               ← GARCH volatility models
 ruptures           ← Bayesian change-point detection
 vectorbt           ← Fast backtesting engine
-praw               ← Reddit sentiment (optional)
 ```
 
 ---

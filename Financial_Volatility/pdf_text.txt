@@ -1,0 +1,83 @@
+APPLIED TIME SERIES ANALYSIS
+FINAL PROJECT REPORT
+(Reference Template for Submission)
+Submitted by: Student ID/ Student Name (Team Details)
+Submitted to:
+DATE OF SUBMISSION:
+Instructions:
+1. Your project report must be written only using the provided Word template. Do not change the section
+order or formatting. Text must be in Times New Roman 12 pt with justified formatting.
+2. The paper must be 6,000–8,000 words and all sections specified below are mandatory without omission.
+3. Plagiarism must be below 20% and AI-generated content must be below 20%. AI may be used only for
+language refinement, not content generation. The report submitted will be checked using
+Turnitin/ithenticate and will be evaluated accordingly.
+4. Your work must be original. It should have at least one innovative component compared to the existing
+works.
+5. Clearly define the research problem and justify all methodological choices. Simple implementations
+without analysis will not be accepted.
+6. Include mandatory system/block diagrams, minimum 3–5 graphs (Performance curves, error analysis,
+comparative results), and at least 3 technical tables (literature comparison, dataset details, performance
+comparison), all properly labeled and numbered.
+7. Add at least 10 references, with the majority from recent journals or conferences (last 5–7 years).
+1. Title of the project: Give a suitable title for your team project. It should be precise,
+technical, and contribution-focused. (2 Marks)
+Example:
+A Hybrid CNN-LSTM Framework for Short-Term Power Load Forecasting Using Multivariate Time Series
+2. Abstract (5 Marks)
+Word Count: 200–250
+The structure of the abstract must include: Problem statement (1–2 lines); Methodology;
+Dataset / Experimental setup; Key results (with numbers); Major contribution
+3. Keywords (1 Mark)
+Word Count: 5–7 keywords that are relevant to your specific project (mix of method +
+application + technique)
+4. Introduction (10 Marks)
+Word Count: 800–1,000
+It should have focus on the domain background of the project; Importance of the problem;
+Real-world motivation of why that problem is important to be solved; Clear problem gap;
+Explicit contributions (bullet points preferred). It should be written in the same flow.
+5. Related Work / Literature Review (15 Marks)
+Word Count: 900–1,200
+It should have a thematic comparison of prior approaches; Strengths & limitations of existing
+approaches; Identify unresolved gaps
+Mandatory Table: Table 1: Comparative Literature Review
+Author, Paper title, Method Dataset Limitation
+year of publication
+6. Problem Formulation & System Overview (10 Marks)
+Word Count: 500–700
+Must include formal problem definition; system architecture and workflow
+Mandatory Figure: Block Diagram of System Architecture
+7. Methodology / Proposed Approach (20 Marks)
+Word Count: 1,200–1,600
+Marks: 20 (Highest weight)
+Should include the details of Data preprocessing; Feature extraction; Model architecture;
+Algorithms used; Hyperparameters
+Mandatory: Algorithm pseudocode; Model architecture diagram; Equations where applicable;
+Sample dataset of before and after preprocessing (if applicable)
+8. Experimental Setup (8 Marks)
+Word Count: 500–700
+Should have details on Dataset description; Train–test split; Hardware & software details
+(Computational resources used for implementation); Evaluation metrics
+9. Results and Performance Analysis (15 Marks)
+Word Count: 800–1,000
+This includes detailed description of the results achieved with appropriate visuals.
+Mandatory Visuals: Line graphs / bar charts/ Confusion matrix / ROC (if applicable) / Error
+plots (Minimum 3)
+Mandatory Table: Performance Comparison with Existing Methods
+10. Discussion (7 Marks)
+Word Count: 400–600
+Interpretation of results achieved, why your method performs better/worse, Failure cases,
+Practical implications
+11. Conclusion (4 Marks)
+Word Count: 250–350
+It includes summary of contributions and key outcomes
+12. Limitations and Future Work (3 Marks)
+Word Count: 250–400
+Limitations of proposed approach, Scalability issues, Realistic future extensions
+13. References (5 Marks)
+At least 10 references that helped your project implementation not older than 5-7 years most
+preferably journals, conference papers, and book chapters. Avoid blogs unless necessary
+14. Appendix (Optional) (Bonus of up to 3 marks if added)
+May Include:
+• Extended mathematical analysis
+• Additional experiments and comparative analysis
+• Code snippets
